@@ -1,0 +1,406 @@
+##### 3. 스프링
+
+* 빈+ 컨테이너
+
+  * 스프링은 엔터프라이즈 애플리케이션을 개발하기에 적합한 프레임워크로 객체 관리를 해주는 빈 컨테이너 프레임워크
+  * EJB
+  * POJO : 일반 자바 클래스로 일반 자바 빈이라는 말 대신에 사용하게 되었다.
+  * 웹 어플리케이션과 상관없이 독립적으로 빈의 생명주기를 관리할 수 있는 스프링 프레임워크
+  * http://spring.io/projects
+  * 모듈간의 의존도를 낮추기 위해 IoC패턴을 사용
+
+* IoC 패턴 활용
+
+  * 제어의 역전
+  * 프로그램의 생명주기에 대한 주도권이 웹 애플리케이션 컨테이너에 있다.
+  * Dependency Inversion Principle(의존관계 역전 원칙) 
+    * 하이레벨 모듈은 로우레벨 모듈에 의존하면 안되고, 모두 인터페이스에 의존해야한다.
+    * 추상화는 세부 사항에 의존해서는 안된다.
+  * 자바에서는 인터페이스를 사용하더라도 인스턴스화(실제 구현화)하기 위해서는 반드시 객체 생성에 필요한 코드가 수반되어 결합도를 분리할 수 없다.
+  * 이것을 대신 해결해주는 것이 의존성 주입(DI)이다
+  * 톨게이트에서 통행권을 뽑는 행위-> 하이패스로 의존성을 대신 주입해준다.
+
+* 인터페이스 예제
+
+  * Boss
+
+    ```java
+    public class Boss implements WorkManager{
+        @Override
+        public String doIt() {
+            return "do boss";
+        }
+    
+        public void onCreated() {
+            System.out.println("boss 생성");
+        }
+    
+        public void onDestroyed() {
+            System.out.println("Boss 소멸");
+        }
+    }
+    ```
+
+  * Employee
+
+    ```java
+    public class Employee implements WorkManager{
+        @Override
+        public String doIt() {
+            return "do work";
+        }
+    
+        public void onCreated() {
+            System.out.println("Employee 생성");
+        }
+    
+        public void onDestroyed() {
+            System.out.println("Employee 소멸");
+        }
+    }
+    ```
+
+  * WorkManager
+
+    * 각 클래스에 일을 시킬때 직접 클래스를 생성하지 않고 인터페이스를 통해 생성하면 필요에 따라 역할을 변경할 수 있다.
+
+    ```java
+    public interface WorkManager {
+        public String doIt();
+    }
+    ```
+
+  * WorkService
+
+    ```java
+    public class WorkService {
+        WorkManager workManager;
+    
+        public void setWorkManager(WorkManager workManager){
+            this.workManager = workManager;
+        }
+    
+        public void askWork(){
+            System.out.println( workManager.doIt() );
+        }
+    
+        @PostConstruct
+        public void onCreated() {
+            System.out.println("초기화 되었을 때");
+        }
+    
+        @PreDestroy
+        public void onDestroyed() {
+            System.out.println("종료되었을 때");
+        }
+    }
+    
+    ```
+
+  * Basic App
+
+    * 같은 askWork메서드를 호출하지만 setWorkManager메서드에 파라미터 결과에 따라 출력 결과가 다르다.
+
+    ```java
+    public class BasicApp {
+        public static void main(String ar[]){
+            WorkService workService = new WorkService();
+            WorkManager employee = new Employee();
+            WorkManager boss = new Boss();
+    
+            workService.setWorkManager(employee);
+            workService.askWork();
+    
+            workService.setWorkManager(boss);
+            workService.askWork();
+        }
+    }
+    ```
+
+* 스프링 XML설정
+
+  * 스프링 컨테이너에 Bean을 등록하고 설정하는 방법은 XML과 어노테이션으로 나누어진다.
+
+  * 설정 파일에 클래스 정보를 입력하면 개발자가 new 연산자를 사용하여 클래스의 인스턴스 생성 없이 스프링이 관리해준다.
+
+  * bean 태그 클래스 속성에는 실제 클래스 파일 경로를 입력하고, id에는 참조에 사용할 값 입력하면 new안쓰고 인스턴스 생성해줌
+
+    ```xml
+        <bean id="boss" class="basic.Boss" init-method="onCreated" destroy-method="onDestroyed"></bean>
+        <bean id="employee" class="basic.Employee" init-method="onCreated" destroy-method="onDestroyed"></bean>
+    ```
+
+  * Service처럼 다른 클래스나 인터페이스를 멤버 변수로 가지는 경우 property 태그를 사용해 명시
+
+    ```xml
+        <bean id="myWorkService" class="basic.WorkService">
+            <property name="workManager">
+                <ref bean="boss"/>
+            </property>
+        </bean>
+    ```
+
+  * 구현타입이 구체화되지 않은 인터페이스의 경우 ref 태그 사용
+
+    ```xml
+        <bean id="yourWorkService" class="basic.WorkService">
+            <property name="workManager">
+                <ref bean="employee"/>
+            </property>
+        </bean>
+    ```
+
+  * GenericXMmlAplicationContext 사용
+
+    ```java
+        public static void main(String ar[]){
+        	GenericXmlApplicationContext context = new GenericXmlApplicationContext(
+                    "classpath:applicationContext.xml"
+            );
+            
+            WorkService myWorkService = context.getBean("myWorkService", WorkService.class);
+            myWorkService.askWork();
+    
+            WorkService yourWorkService = context.getBean("yourWorkService", WorkService.class);
+            yourWorkService.askWork();
+            context.close();
+        }
+    ```
+
+* 스프링 JavaConig 설정
+
+  * Configuration 어노테이션을 클래스 상단에 추가해 이 클래스가 빈 설정 정보가 포함된 클래스임을 명시
+
+    ```java
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.context.annotation.Import;
+    
+    @Configuration
+    @Import(CompanyConfig.class)
+    public class BeanConfig {
+        @Bean
+        public WorkManager employee() {
+            return new Employee();
+        }
+    
+        @Bean
+        public WorkManager boss() {
+            return new Boss();
+        }
+    
+        @Bean
+        public WorkService yourWorkService() {
+            WorkService workService = new WorkService();
+            workService.setWorkManager(employee());
+            return workService;
+        }
+    
+        @Bean
+        public WorkService myWorkService() {
+            WorkService workService = new WorkService();
+            workService.setWorkManager(boss());
+            return workService;
+        }
+    }
+    ```
+
+    ```java
+    public class JavaConfigSpringApp {
+        public static void main(String ar[]){
+            AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+            context.register(BeanConfig.class);
+            context.refresh();
+    
+            WorkService yourWorkService = context.getBean("yourWorkService", WorkService.class);
+            yourWorkService.askWork();
+    
+            WorkService myWorkService = context.getBean("myWorkService", WorkService.class);
+            myWorkService.askWork();
+    
+            context.close();
+        }
+    }
+    ```
+
+    ​	
+
+  * Import 어노테이션 사용
+
+    * 설정해야할 내용이 많은 경우 설정 내용을 파일별로 분리하고 Import 어노테이션을 사용해서 적용
+
+  * 생명주기 제어
+
+    * PostConstruct
+
+      ```java
+          @PostConstruct
+          public void onCreated() {
+              System.out.println("employee 초기화");
+          }
+      ```
+
+      
+
+    * PreDestory
+
+      ```java
+          @PreDestroy
+          public void onDestroyed() {
+              System.out.println("employee 소멸");
+          }
+      ```
+
+* 스프링 MVC
+
+  * Front Controller 패턴에 스프링의 의존성 주입을 이용해서 컴포넌트의 생명주기를 관리할 수 있는 웹 MVC프레임 워크
+
+  * 웹 MVC프레임워크는 모델의 상태 변화를 처리하여야 하기 때문에 HTTP 요청을 처리하는 컨트롤러 역할의 비중이 크다.
+
+  * 스프링 MVC 구조
+
+    * DispatcherServlet, View Resolver, Interceptor, Handler, View 등으로 구성
+    * DispatcherServlet이 요청을 받으면 Handler의 이름을 HandlerMapping에 물어본다
+    * HandlerMapping은 URL을 보고 Handler판단 및 전처리, 후처리로 실행해야할 인터셉터 목록을 결정
+    * DispatcherServlet이 제어권을 Handler로 전달.
+    * Handler는 응답에 필요한 서비스를 호출하고 렌더링해야 하는 View Name을 판단해서 DispatcherServlet에 전달.
+    * DispatcherServlet은 View Name을 ViewResolver에 전달해서 View 생성
+    * View에 Model과 컨트롤러를 전달
+
+  * 스프링 MVC 설정
+
+    * DispatherServlet 설정
+
+      * web.xml에 서블릿 태크를 추가 web-app/WEB-INF
+
+      * Servlet 태그에 DispatcherServlet 클래스의 전체 경로를 등록
+
+      * servlet-mapping 태그의 하위의 servlet-name 은 servlet 태그 하위의 servlet-name 태그값과 동일하게
+
+      * url-pattern 태그에서는 모든 요청에 대해 응답받을 수 있도록 / 로 정의
+
+        ```xml
+        <?xml version="1.0" encoding="UTF-8"?>
+        <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+                 version="3.1">
+            <context-param>
+                <param-name>contextConfigLocation</param-name>
+                <param-value>/WEB-INF/applicationContext.xml</param-value>
+            </context-param>
+            <listener>
+                <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+            </listener>
+            <servlet>
+                <servlet-name>dispatcher</servlet-name>
+                <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+                <load-on-startup>1</load-on-startup>
+            </servlet>
+            <servlet-mapping>
+                <servlet-name>dispatcher</servlet-name>
+                <url-pattern>/</url-pattern>
+            </servlet-mapping>
+        </web-app>
+        ```
+
+        * dispatcher-servlet.xml
+
+          * 인터셉터, 컨트롤러와 같은 웹 패키지에 해당하는 클래스들의 설정을 지정할 수 있는 파일이다.
+
+          * 컨트롤러 클래스들을 위치시킬 패키지 지정과 URL과 페이지 매핑이 필요하다.
+
+          * XML 파일로 구조나 속성을 정의하고 표현하려면 XML Schema Definition 파일을 사용해야 한다.
+
+          * viewResolver 지정. 클래스는 UrlBasedViewResolver. viewClass는 InternalResourceView로 지정.
+
+          * prefix와 suffix는 실제 물리 파일에 대한 설정이다
+
+            * prefix: 뷰 역할을 하는 HTML 또는 JSP 파일들의 경로.
+            * suffix: 뷰 이름과 매칭되는 확장자 ex) 컨트롤러에서 뷰 이름을 home으로 지정해서 반환시 home.jsp를 찾아감
+
+            ```xml
+            <?xml version="1.0" encoding="UTF-8"?>
+            <beans xmlns="http://www.springframework.org/schema/beans"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns:context="http://www.springframework.org/schema/context"
+                   xmlns:mvc="http://www.springframework.org/schema/mvc"
+                   xsi:schemaLocation="http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
+                    http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+            
+                <context:component-scan base-package="info.thecodinglive.controller" />
+                <bean id="viewResolver"
+                      class="org.springframework.web.servlet.view.UrlBasedViewResolver">
+                    <property name="viewClass"
+                              value="org.springframework.web.servlet.view.JstlView" />
+                    <property name="prefix" value="/WEB-INF/views/" />
+                    <property name="suffix" value=".jsp" />
+                </bean>
+            
+                <mvc:interceptors>
+                    <mvc:interceptor>
+                        <mvc:mapping path="/"/>
+                        <bean class="info.thecodinglive.interceptor.JpubInterceptor"/>
+                    </mvc:interceptor>
+                </mvc:interceptors>
+            </beans>
+            ```
+
+      * 컨트롤러와 뷰
+
+        * ModelAndView : 모델과 View를 지정할 수 있다.
+        * addObject를 통해 map의 put처럼 사용
+        * 뷰 이름이 home -> home.jsp를 찾아간다.
+
+        ```java
+        @Controller
+        public class IndexController {
+        
+        	@RequestMapping("/")
+            public ModelAndView home(){
+               // return new ModelAndView("home");
+                ModelAndView mv=new ModelAndView("home");
+                mv.addObject("title", "Jpub Spring WEB");
+                mv.addObject("today", new Date().toString());
+        
+                return mv;
+            }
+        }
+        
+        ```
+
+      * 인터셉터 클래스
+
+        * 스프링 MVC 모듈에서는 인터셉터를 이용해서 요청 처리  전이나 후에 로직을 추가할 수 있다.
+
+        * HandlerInterceptorAdaptor 클래스를 상속받아 사용
+
+          ```java
+          public class JpubInterceptor extends HandlerInterceptorAdapter {
+              @Override
+              public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+                  System.out.println("preHandle 메소드 실행");
+                  return true;
+              }
+          
+              @Override
+              public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+                  System.out.println("postHandle 메소드 실행");
+              }
+          
+              @Override
+              public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+                  System.out.println("afterCompletion 메소드 실행");
+              }
+          //비동기 처리를 위한 메소드
+              @Override
+              public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+                  super.afterConcurrentHandlingStarted(request, response, handler);
+              }
+          }
+          ```
+
+          
+
+      * javaConfig 방식으로 등록
