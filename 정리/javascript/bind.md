@@ -43,6 +43,27 @@ let double = mul.bind(null, 2);
 alert( double(3) ); // = mul(2, 3) = 6
 ```
 
+```javascript
+let user = {
+  firstName: "John",
+  sayHi() {
+    console.log(`hello, ${this.firstName}!`);
+  },
+};
+class test {
+  constructor() {
+    this.firstName = "park";
+    //this.sayHi = this.sayHi.bind(this);
+  }
+  sayHi() {
+    console.log(`hello, ${this.firstName}!`);
+  }
+}
+setTimeout(new test().sayHi, 1000);
+new test().sayHi();
+
+```
+
 
 
 > 출처 : https://ko.javascript.info/bind
